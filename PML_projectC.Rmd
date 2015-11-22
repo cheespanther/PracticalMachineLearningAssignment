@@ -152,4 +152,4 @@ prediccion_testRF
 
 # Conclusions
 
-The model was run correctly and proved to have high accuracy for the training set, however the final data still has to be turned in to compare with the actual values.
+The model was run correctly and proved to have high accuracy for the training set, however the final data still has to be turned in to compare with the actual values. Estimated error rate for the model used in the training data set is 0.62%. 
