@@ -148,8 +148,26 @@ Since in the pre processing part of the algorithim the test data was also prepro
 prediccion_testRF <- predict(modelRF, newdata = modelo_limpio)
 prediccion_testRF
 
+## Classe data was transformed to integers, so this needs to be corrected
+prediccion_testRF <- gsub('1', 'A', prediccion_testRF)
+prediccion_testRF <- gsub('2', 'B', prediccion_testRF)
+prediccion_testRF <- gsub('3', 'C', prediccion_testRF)
+prediccion_testRF <- gsub('4', 'D', prediccion_testRF)
+prediccion_testRF <- gsub('5', 'E', prediccion_testRF)
+
+## Code that exports results into single text files
+
+pml_write_files = function(prediccion_testRF){
+  n = length(prediccion_testRF)
+  for(i in 1:n){
+    filename = paste0("problem_id_",i,".txt")
+    write.table(prediccion_testRF[i],file=filename,quote=FALSE,row.names=FALSE,col.names=FALSE)
+  }
+}
+
+pml_write_files(prediccion_testRF)
 ```
 
 # Conclusions
 
-The model was run correctly and proved to have high accuracy for the training set, however the final data still has to be turned in to compare with the actual values. Estimated error rate for the model used in the training data set is 0.62%. 
+The model was run correctly and proved to have high accuracy for the training set, however the final data still has to be turned in to compare with the actual values. Estimated error rate for the model used in the training data set is 0.62%. All values submited to the Coursera website were correct. However an extra bit of code had to be written to convert classe values back to letters, because during the preprocessing phase leters were transformed to numbers accidentally. There was not enough time to go back and fix the code, so final submission was converted from numbers back to letters. 
