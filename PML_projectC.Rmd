@@ -1,0 +1,155 @@
+---
+title: "Practical Machine Learning Assignment"
+author: "Iskar Waluyo"
+date: "06/11/2015"
+output: html_document
+---
+# Summary
+
+The purpose of this project is to write an algorithm that uses the "Weight Lifiting Exercise Dataset (http://groupware.les.inf.puc-rio.br/har) to predict how well an excercise was done. The dataset contains information gathered from accelerometers on the belt, forearm, arm, and dumbell of 6 participants. 
+
+The training data is available here: 
+
+https://d396qusza40orc.cloudfront.net/predmachlearn/pml-training.csv
+
+The test data isa available here: 
+
+https://d396qusza40orc.cloudfront.net/predmachlearn/pml-testing.csv
+
+The exercises were lables classes A,B,C,D and E. Class A corresponds to the execution of an exercise and Class B thru E identify common mistakes. 
+
+# Part I: Loading/Pre-Processing Data and Loading Libraries
+
+The test data was named "datos_modelo" and the training data was named "datos_train". Once the data was loaded the train data was split by the 5 classes (A, B, C, D, E). This is not necesary for the algorithm but was done in order to analyze the data easier before the algorithm was written. After that, the data was checked for columns. Also in this part of the code, the following libraries were loaded: caret, plyr, lattice, ggplot2 and randomForest.  
+
+The data is preprocessed. One of the most time consuming errors encountered while writing this algorithm was making sure the testing and training data frames were the same. The model will not work if the data frames are not structured identically. So all data frames were preprocessed before designing the model. The preProcessing done was as follows: 
+
+1. Ensure all column headers were the same
+2. Ensure all colunns were the same class (integer, numeric, factor, etc.)
+3. Removed all columns that had 90% or more "NA" values
+4. Test data for all complete cases 
+5. Data classes such as user names and timestamps that was not necessary was removed
+6. Test data to check the column names matched
+
+```{r}
+library(caret)
+library(plyr)
+library(lattice)
+library(ggplot2)
+library(randomForest)
+
+setwd("~/R/PRACTICAL MACHINE LEARNING (HUMAN ACTIVITY)/DATA")
+datos_modelo <- read.csv("pml-testing.csv", na.strings = c("NA", "#DIV/0!"))
+datos_train <- read.csv("pml-training.csv", na.strings = c("NA", "#DIV/0!"))
+## Pre process data so that they are the same class and have same column names
+colnames(datos_modelo) <- c(names(datos_train))
+## When running the model a common error was that there was a mistake in the types of data for each data set, so a data class check was designed
+class_test <- sapply(datos_train, class) != sapply(datos_modelo, class)
+sum(class_test)
+different_classes <- c(names(subset(datos_train[class_test])))
+## Class test shows there are 3 columns that are different classes, so these are now changed
+datos_train[,different_classes] <- as.numeric(as.character(unlist(datos_train[,different_classes])))
+datos_modelo[,different_classes] <- as.numeric(as.character(unlist(datos_modelo[,different_classes])))
+## Run the class test again to make sure classes are the same
+
+class_test <- sapply(datos_train, class) != sapply(datos_modelo, class)
+sum(class_test)
+
+particiones <- createDataPartition(y=datos_train$classe, p = 0.7, list = FALSE)
+entrenamiento <- datos_train[particiones,]
+prueba <- datos_train[-particiones,]
+
+## Check for NA columns. In order to make sure that columns with NA were the same in both training and testing sets. Both were tested then the lists were checed for duplicates. 
+sum(complete.cases(prueba))/nrow(prueba)
+sum(complete.cases(entrenamiento))/nrow(entrenamiento)
+## Only about 2% of the cases are complete so, in order to improve this, all columns with less than 90% of rows filled are removed. New data sets are created with this filter
+
+train_limpio <- entrenamiento[, colSums(!is.na(entrenamiento)) > 0.90*nrow(entrenamiento)]
+test_limpio <- prueba[, colSums(!is.na(prueba)) > 0.90*nrow(prueba)]
+modelo_limpio <- datos_modelo[, colSums(!is.na(datos_modelo)) > 0.90*nrow(datos_modelo)]
+
+## Now the first 7 colums are removed since they are only time stamps and usernames. This can also be factors that affect how well an exercise was done, but will not be considered in this case. 
+
+train_limpio <- train_limpio[,8:60]
+test_limpio <- test_limpio[,8:60]
+modelo_limpio <- modelo_limpio[,8:60]
+
+## Check that all of the data entries are Complete Cases (1 = 100%)
+sum(complete.cases(train_limpio))/nrow(train_limpio)
+sum(complete.cases(test_limpio))/nrow(test_limpio)
+sum(complete.cases(modelo_limpio))/nrow(modelo_limpio)
+
+## Check that this process did not remove different columns (1 = 100%)
+sum(names(train_limpio) == names(test_limpio))/ncol(train_limpio)
+sum(names(modelo_limpio) == names(test_limpio))/ncol(modelo_limpio)
+
+```
+
+# Part II: Data Exploration
+
+In this part of the algorithm we made a few preliminary graphs in order to visualize how the data was structured. This helps determine if the type of model used (Random Forest in this case) is a proper type of model. In these graphs the idea is to look for any seemingly linear relationships or not. 
+
+```{r, eval=FALSE}
+
+## This is not necessary, but for me it was easier to check the data by class before deciding what model to use. 
+datosplit <<- split(train_limpio, train_limpio$classe)
+new_names <<- c("A", "B", "C", "D", "E")
+    for (i in 1:length(datosplit)) 
+        {
+          assign(new_names[i], datosplit[[i]])
+        }  
+
+str(train_limpio)
+str(A)
+str(B)
+summary(train_limpio)
+
+##
+
+```
+
+# Part III: Selecting a Model and Training it 
+
+A Random Forest model was selected for the model type run. 
+
+```{r, eval=TRUE}
+
+## RF Model (Random Forest with 13 trees square root of number of characteristics)
+set.seed(1500)
+modelRF <- randomForest(as.factor(classe)~., data=train_limpio, ntree = 100)
+prediccion_trainRF <- predict(modelRF, newdata = test_limpio)
+modelRF
+```
+
+Once the model is run and we have a prediction created with the training data "prediccion_trainRF". This information can be checked with the original data. 
+
+```{r, eval=TRUE}
+## The real values are compared with the predicted values of the training data
+train_real <- test_limpio$classe
+comparar_RF <- duplicated(cbind(train_real, prediccion_trainRF))
+
+aciertos_RF <- sum(comparar_RF == TRUE)
+errores_RF <- sum(comparar_RF == FALSE)
+precision_RF <- aciertos_RF/(aciertos_RF + errores_RF)
+
+##This is the accuracy for the prediction of the training data set. The high accuracy is probably due to model overfitting because there are many predictors (more than 50). 
+precision_RF
+
+```
+
+# Part IV: Running the model with the test data
+
+Since in the pre processing part of the algorithim the test data was also preproccessed, the model can be run directly. 
+
+
+```{r, eval=TRUE}
+# In order for the model to run, the test data should have the same columns, so it should be subset
+
+prediccion_testRF <- predict(modelRF, newdata = modelo_limpio)
+prediccion_testRF
+
+```
+
+# Conclusions
+
+The model was run correctly and proved to have high accuracy for the training set, however the final data still has to be turned in to compare with the actual values.
